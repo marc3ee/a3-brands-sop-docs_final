@@ -90,7 +90,7 @@ export default function LoginPage() {
           </form>
 
           {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-[var(--a3-border)]">
+          {/* <div className="mt-6 pt-6 border-t border-[var(--a3-border)]">
             <p className="text-xs text-[var(--a3-text-muted)] mb-3 font-medium uppercase tracking-wider">
               Demo Credentials
             </p>
@@ -110,7 +110,7 @@ export default function LoginPage() {
                 <code className="text-xs text-[var(--a3-text-muted)]">dev@a3brands.com</code>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Footer */}
