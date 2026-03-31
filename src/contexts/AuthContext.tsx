@@ -9,7 +9,8 @@ import {
   ReactNode,
 } from "react";
 
-export type UserRole = "admin" | "user";
+export type { UserRole } from "@/lib/roles";
+import type { UserRole } from "@/lib/roles";
 
 interface User {
   id: string;
@@ -24,6 +25,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   isAdmin: boolean;
+  isSuperuser: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -59,8 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const isSuperuser = user?.role === "SUPERUSER";
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, isAdmin: user?.role === "admin" }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, isAdmin: isSuperuser, isSuperuser }}>
       {children}
     </AuthContext.Provider>
   );

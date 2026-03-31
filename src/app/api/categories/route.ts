@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { requireAuth, requireSuperuser } from "@/lib/auth-guard";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const userOrRes = requireAuth(req);
+  if (userOrRes instanceof NextResponse) return userOrRes;
+
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("categories")
@@ -13,6 +17,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const userOrRes = requireSuperuser(req);
+  if (userOrRes instanceof NextResponse) return userOrRes;
+
   const supabase = createServerClient();
   const { name, sort_order } = await req.json();
 

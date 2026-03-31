@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
   const user = sessionValue ? decodeSession(sessionValue) : null;
 
   const isAuthed = user !== null;
-  const isAdmin = user?.role === "admin";
+  const isSuperuser = user?.role === "SUPERUSER";
 
   // Redirect logged-in users away from login page
   if (isAuthed && pathname === "/login") {
@@ -20,8 +20,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Protect /admin — redirect non-admins to /sops
-  if (isAuthed && !isAdmin && pathname.startsWith("/admin")) {
+  // Protect /admin — redirect non-superusers to /sops
+  if (isAuthed && !isSuperuser && pathname.startsWith("/admin")) {
     return NextResponse.redirect(new URL("/sops", request.url));
   }
 

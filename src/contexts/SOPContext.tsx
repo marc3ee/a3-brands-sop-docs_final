@@ -9,6 +9,7 @@ import {
   ReactNode,
 } from "react";
 import type { SOPStep } from "@/types/database";
+import type { UserRole } from "@/lib/roles";
 
 export interface SOP {
   id: string;
@@ -20,6 +21,9 @@ export interface SOP {
   version: string;
   tags: string[];
   steps: SOPStep[];
+  content_html: string | null;
+  role_visibility: UserRole[];
+  created_by: string | null;
   last_updated: string;
 }
 
@@ -41,6 +45,8 @@ interface SOPContextType {
     version: string;
     tags: string[];
     steps: SOPStep[];
+    content_html?: string;
+    role_visibility?: UserRole[];
   }) => Promise<void>;
   updateSOP: (
     id: string,
@@ -51,12 +57,15 @@ interface SOPContextType {
       version: string;
       tags: string[];
       steps: SOPStep[];
+      content_html: string;
+      role_visibility: UserRole[];
     }>
   ) => Promise<void>;
   deleteSOP: (id: string) => Promise<void>;
   getSOP: (slug: string) => SOP | undefined;
   addCategory: (name: string) => Promise<Category | null>;
   refreshSOPs: () => Promise<void>;
+  uploadPDF: (file: File) => Promise<SOP | null>;
 }
 
 const SOPContext = createContext<SOPContextType | null>(null);
@@ -73,6 +82,9 @@ function rowToSOP(row: Record<string, unknown>): SOP {
     version: row.version as string,
     tags: (row.tags as string[]) ?? [],
     steps: (row.steps as SOPStep[]) ?? [],
+    content_html: (row.content_html as string) ?? null,
+    role_visibility: (row.role_visibility as UserRole[]) ?? [],
+    created_by: (row.created_by as string) ?? null,
     last_updated: row.last_updated as string,
   };
 }
@@ -89,8 +101,8 @@ export function SOPProvider({ children }: { children: ReactNode }) {
       fetch("/api/sops"),
     ]);
     const [catsData, sopsData] = await Promise.all([catsRes.json(), sopsRes.json()]);
-    setCategories(catsData);
-    setSOPs(sopsData.map(rowToSOP));
+    setCategories(Array.isArray(catsData) ? catsData : []);
+    setSOPs(Array.isArray(sopsData) ? sopsData.map(rowToSOP) : []);
     setIsLoading(false);
   }, []);
 
@@ -107,6 +119,8 @@ export function SOPProvider({ children }: { children: ReactNode }) {
       version: string;
       tags: string[];
       steps: SOPStep[];
+      content_html?: string;
+      role_visibility?: UserRole[];
     }) => {
       const res = await fetch("/api/sops", {
         method: "POST",
@@ -134,6 +148,8 @@ export function SOPProvider({ children }: { children: ReactNode }) {
         version: string;
         tags: string[];
         steps: SOPStep[];
+        content_html: string;
+        role_visibility: UserRole[];
       }>
     ) => {
       const res = await fetch(`/api/sops/${id}`, {
@@ -187,6 +203,31 @@ export function SOPProvider({ children }: { children: ReactNode }) {
     [categories]
   );
 
+  const uploadPDF = useCallback(async (file: File): Promise<SOP | null> => {
+    const formData = new FormData();
+    formData.append("pdf", file);
+
+    const res = await fetch("/api/sops/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      console.error("Error uploading PDF:", error);
+      throw new Error(error || "Upload failed");
+    }
+
+    const data = await res.json();
+    const newSOP = rowToSOP(data);
+    setSOPs((prev) => [newSOP, ...prev]);
+    // Also refresh categories in case "Uploaded SOPs" was created
+    const catsRes = await fetch("/api/categories");
+    const catsData = await catsRes.json();
+    setCategories(Array.isArray(catsData) ? catsData : []);
+    return newSOP;
+  }, []);
+
   return (
     <SOPContext.Provider
       value={{
@@ -199,6 +240,7 @@ export function SOPProvider({ children }: { children: ReactNode }) {
         getSOP,
         addCategory,
         refreshSOPs,
+        uploadPDF,
       }}
     >
       {children}
