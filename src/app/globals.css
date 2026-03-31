@@ -1,31 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --a3-green: #4CAF50;
-  --a3-green-dark: #388E3C;
-  --a3-green-light: #81C784;
-  --a3-gray: #9E9E9E;
-  --a3-gray-dark: #424242;
-  --a3-gray-light: #F5F5F5;
-  --a3-bg: #0f1117;
-  --a3-bg-secondary: #161922;
-  --a3-bg-card: #1c1f2e;
-  --a3-border: #2a2d3e;
-  --a3-text: #e4e4e7;
-  --a3-text-muted: #9ca3af;
-  --sidebar-width: 280px;
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --primary-light: #EFF6FF;
+  --bg: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --border: #E2E8F0;
+  --text: #0F172A;
+  --text-muted: #64748B;
+  --sidebar-width: 240px;
 }
 
 body {
-  background: var(--a3-bg);
-  color: var(--a3-text);
+  background: var(--bg);
+  color: var(--text);
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 /* Code block styling */
 .code-block {
-  background: #1e1e2e;
-  border: 1px solid var(--a3-border);
+  background: #1e293b;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
@@ -40,14 +36,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--a3-bg);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--a3-border);
+  background: #CBD5E1;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--a3-gray);
+  background: #94A3B8;
 }
 
 /* Sidebar scroll */
@@ -58,13 +54,13 @@ body {
   background: transparent;
 }
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background: var(--a3-border);
+  background: #E2E8F0;
   border-radius: 2px;
 }
 
 /* Custom checkbox */
 .checklist-item input[type="checkbox"] {
-  accent-color: var(--a3-green);
+  accent-color: var(--primary);
 }
 
 /* ─── Rich Text Editor (TipTap) ─── */
@@ -73,7 +69,7 @@ body {
   padding: 12px 16px;
   font-size: 14px;
   line-height: 1.7;
-  color: var(--a3-text);
+  color: var(--text);
   outline: none;
 }
 
@@ -84,10 +80,16 @@ body {
 .rich-editor-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--a3-text-muted);
+  color: var(--text-muted);
   opacity: 0.5;
   pointer-events: none;
   height: 0;
+}
+
+.rich-editor-content h1 {
+  font-size: 1.75em;
+  font-weight: 800;
+  margin: 1em 0 0.5em;
 }
 
 .rich-editor-content h2 {
@@ -121,8 +123,8 @@ body {
 }
 
 .rich-editor-content code {
-  background: var(--a3-bg-card);
-  border: 1px solid var(--a3-border);
+  background: #F1F5F9;
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
@@ -130,8 +132,8 @@ body {
 }
 
 .rich-editor-content pre {
-  background: #1e1e2e;
-  border: 1px solid var(--a3-border);
+  background: #1e293b;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
   margin: 0.8em 0;
@@ -144,7 +146,7 @@ body {
   padding: 0;
   font-size: 13px;
   line-height: 1.6;
-  color: #d4d4d4;
+  color: #e2e8f0;
 }
 
 .rich-editor-content ul {
@@ -164,16 +166,16 @@ body {
 }
 
 .rich-editor-content blockquote {
-  border-left: 3px solid var(--a3-green);
+  border-left: 3px solid var(--primary);
   padding-left: 16px;
   margin: 0.8em 0;
-  color: var(--a3-text-muted);
+  color: var(--text-muted);
   font-style: italic;
 }
 
 .rich-editor-content a,
 .rich-editor-content .rich-link {
-  color: var(--a3-green);
+  color: var(--primary);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -183,38 +185,157 @@ body {
   max-width: 100%;
   height: auto;
   border-radius: 8px;
-  border: 1px solid var(--a3-border);
+  border: 1px solid var(--border);
   margin: 0.8em 0;
 }
 
 .rich-editor-content hr {
   border: none;
-  border-top: 1px solid var(--a3-border);
+  border-top: 1px solid var(--border);
   margin: 1.2em 0;
 }
 
-/* ─── Rich content in SOP detail view ─── */
+/* ─── SOP content rendered HTML ─── */
+.sop-content h1 {
+  font-size: 1.75em;
+  font-weight: 800;
+  margin: 0 0 0.5em;
+  color: var(--text);
+}
+
+.sop-content h2 {
+  font-size: 1.3em;
+  font-weight: 700;
+  margin: 1.5em 0 0.4em;
+  color: var(--text);
+}
+
+.sop-content h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 1em 0 0.3em;
+  color: var(--text);
+}
+
+.sop-content p {
+  margin-bottom: 0.75em;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.sop-content strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sop-content em {
+  font-style: italic;
+}
+
+.sop-content code {
+  background: #F1F5F9;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.88em;
+}
+
+.sop-content pre {
+  background: #1e293b;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0.8em 0;
+  overflow-x: auto;
+}
+
+.sop-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+
+.sop-content ul {
+  list-style: disc;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+  color: var(--text-muted);
+}
+
+.sop-content ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+  color: var(--text-muted);
+}
+
+.sop-content li {
+  margin: 0.3em 0;
+  line-height: 1.6;
+}
+
+.sop-content blockquote {
+  border-left: 3px solid var(--primary);
+  padding: 12px 16px;
+  margin: 0.8em 0;
+  background: var(--primary-light);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.sop-content blockquote.warning {
+  border-left-color: #F59E0B;
+  background: #FFFBEB;
+  color: #92400E;
+}
+
+.sop-content blockquote.note {
+  border-left-color: var(--primary);
+  background: var(--primary-light);
+  color: #1E40AF;
+}
+
+.sop-content a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.sop-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin: 0.8em 0;
+}
+
+/* ─── Rich content in SOP detail view (legacy) ─── */
 .rich-content h2 {
   font-size: 1.3em;
   font-weight: 700;
   margin: 1em 0 0.4em;
+  color: var(--text);
 }
 
 .rich-content h3 {
   font-size: 1.1em;
   font-weight: 600;
   margin: 0.8em 0 0.3em;
+  color: var(--text);
 }
 
 .rich-content p {
   margin-bottom: 0.5em;
-  color: var(--a3-text-muted);
+  color: var(--text-muted);
   line-height: 1.7;
 }
 
 .rich-content strong {
   font-weight: 700;
-  color: var(--a3-text);
+  color: var(--text);
 }
 
 .rich-content em {
@@ -222,8 +343,8 @@ body {
 }
 
 .rich-content code {
-  background: var(--a3-bg-card);
-  border: 1px solid var(--a3-border);
+  background: #F1F5F9;
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
@@ -231,8 +352,7 @@ body {
 }
 
 .rich-content pre {
-  background: #1e1e2e;
-  border: 1px solid var(--a3-border);
+  background: #1e293b;
   border-radius: 8px;
   padding: 16px;
   margin: 0.8em 0;
@@ -245,21 +365,21 @@ body {
   padding: 0;
   font-size: 13px;
   line-height: 1.6;
-  color: #d4d4d4;
+  color: #e2e8f0;
 }
 
 .rich-content ul {
   list-style: disc;
   padding-left: 1.5em;
   margin: 0.5em 0;
-  color: var(--a3-text-muted);
+  color: var(--text-muted);
 }
 
 .rich-content ol {
   list-style: decimal;
   padding-left: 1.5em;
   margin: 0.5em 0;
-  color: var(--a3-text-muted);
+  color: var(--text-muted);
 }
 
 .rich-content li {
@@ -267,15 +387,15 @@ body {
 }
 
 .rich-content blockquote {
-  border-left: 3px solid var(--a3-green);
+  border-left: 3px solid var(--primary);
   padding-left: 16px;
   margin: 0.8em 0;
-  color: var(--a3-text-muted);
+  color: var(--text-muted);
   font-style: italic;
 }
 
 .rich-content a {
-  color: var(--a3-green);
+  color: var(--primary);
   text-decoration: underline;
 }
 
@@ -283,6 +403,6 @@ body {
   max-width: 100%;
   height: auto;
   border-radius: 8px;
-  border: 1px solid var(--a3-border);
+  border: 1px solid var(--border);
   margin: 0.8em 0;
 }

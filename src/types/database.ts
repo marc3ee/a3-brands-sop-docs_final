@@ -1,3 +1,5 @@
+import type { UserRole } from "@/lib/roles";
+
 export interface SOPStep {
   title: string;
   description: string;
@@ -24,6 +26,9 @@ export interface SOPRow {
   version: string;
   tags: string[];
   steps: SOPStep[];
+  content_html: string | null;
+  role_visibility: UserRole[];
+  created_by: string | null;
   last_updated: string;
   created_at: string;
   updated_at: string;
@@ -37,6 +42,17 @@ export interface Profile {
   id: string;
   display_name: string;
   role: "admin" | "user";
+  created_at: string;
+}
+
+export interface AuditLogRow {
+  id: string;
+  user_email: string;
+  user_role: string;
+  action: string;
+  document_id: string | null;
+  document_title: string | null;
+  details: string | null;
   created_at: string;
 }
 
@@ -57,6 +73,11 @@ export interface Database {
         Row: SOPRow;
         Insert: Omit<SOPRow, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<SOPRow, "id" | "created_at" | "updated_at">>;
+      };
+      audit_logs: {
+        Row: AuditLogRow;
+        Insert: Omit<AuditLogRow, "id" | "created_at">;
+        Update: never;
       };
     };
   };

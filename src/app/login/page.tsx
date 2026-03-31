@@ -28,54 +28,54 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--a3-bg)]">
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <Logo size="lg" />
           </div>
-          <h1 className="text-2xl font-bold mt-4">Developer Documentation</h1>
-          <p className="text-[var(--a3-text-muted)] text-sm mt-1">
-            Standard Operating Procedures Portal
+          <h1 className="text-2xl font-bold text-gray-900 mt-4">Knowledge Base</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Sign in to access your documentation
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-[var(--a3-bg-secondary)] border border-[var(--a3-border)] rounded-xl p-8">
-          <h2 className="text-lg font-semibold mb-6">Sign In</h2>
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Sign In</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[var(--a3-text-muted)] mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Email
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[var(--a3-bg)] border border-[var(--a3-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4CAF50] focus:ring-1 focus:ring-[#4CAF50] transition-colors"
+                className="w-full bg-white border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                 placeholder="you@a3brands.com"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--a3-text-muted)] mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[var(--a3-bg)] border border-[var(--a3-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4CAF50] focus:ring-1 focus:ring-[#4CAF50] transition-colors"
+                className="w-full bg-white border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                 placeholder="Enter password"
                 required
               />
             </div>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5 text-sm text-red-400">
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-600">
                 {error}
               </div>
             )}
@@ -83,39 +83,16 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#4CAF50] hover:bg-[#388E3C] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
+              className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
-
-          {/* Demo Credentials */}
-          {/* <div className="mt-6 pt-6 border-t border-[var(--a3-border)]">
-            <p className="text-xs text-[var(--a3-text-muted)] mb-3 font-medium uppercase tracking-wider">
-              Demo Credentials
-            </p>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between bg-[var(--a3-bg)] rounded-lg px-3 py-2">
-                <div>
-                  <span className="text-xs font-mono text-[#4CAF50]">Admin</span>
-                  <span className="text-xs text-[var(--a3-text-muted)] ml-2">Full access</span>
-                </div>
-                <code className="text-xs text-[var(--a3-text-muted)]">admin@a3brands.com</code>
-              </div>
-              <div className="flex items-center justify-between bg-[var(--a3-bg)] rounded-lg px-3 py-2">
-                <div>
-                  <span className="text-xs font-mono text-blue-400">User</span>
-                  <span className="text-xs text-[var(--a3-text-muted)] ml-2">Read-only</span>
-                </div>
-                <code className="text-xs text-[var(--a3-text-muted)]">dev@a3brands.com</code>
-              </div>
-            </div>
-          </div> */}
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-[var(--a3-text-muted)] mt-6">
-          A3 Brands LLC &mdash; Automotive SEO Experts
+        <p className="text-center text-xs text-gray-400 mt-6">
+          A3 Brands LLC &mdash; Internal Knowledge Base
         </p>
       </div>
     </div>

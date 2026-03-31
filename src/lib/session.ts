@@ -1,4 +1,4 @@
-import type { UserRole } from "@/contexts/AuthContext";
+import type { UserRole } from "@/lib/roles";
 
 export interface SessionUser {
   id: string;

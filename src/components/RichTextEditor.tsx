@@ -131,14 +131,14 @@ export default function RichTextEditor({
   const btnClass = (active: boolean) =>
     `p-1.5 rounded transition-colors ${
       active
-        ? "bg-[#4CAF50]/20 text-[#4CAF50]"
-        : "text-[var(--a3-text-muted)] hover:text-[var(--a3-text)] hover:bg-[var(--a3-bg-card)]"
+        ? "bg-blue-100 text-blue-600"
+        : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
     }`;
 
   return (
-    <div className="border border-[var(--a3-border)] rounded-lg overflow-hidden bg-[var(--a3-bg)]">
+    <div className="border border-[#E2E8F0] rounded-lg overflow-hidden bg-white">
       {/* Toolbar */}
-      <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-[var(--a3-border)] bg-[var(--a3-bg-secondary)] flex-wrap">
+      <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-[#E2E8F0] bg-gray-50 flex-wrap">
         {!minimal && (
           <>
             <button
@@ -157,7 +157,7 @@ export default function RichTextEditor({
             >
               <span className="text-xs font-bold w-5 h-5 flex items-center justify-center">H3</span>
             </button>
-            <div className="w-px h-5 bg-[var(--a3-border)] mx-1" />
+            <div className="w-px h-5 bg-gray-300 mx-1" />
           </>
         )}
 
@@ -202,7 +202,7 @@ export default function RichTextEditor({
           </svg>
         </button>
 
-        <div className="w-px h-5 bg-[var(--a3-border)] mx-1" />
+        <div className="w-px h-5 bg-gray-300 mx-1" />
 
         <button
           type="button"
@@ -246,7 +246,7 @@ export default function RichTextEditor({
           </svg>
         </button>
 
-        <div className="w-px h-5 bg-[var(--a3-border)] mx-1" />
+        <div className="w-px h-5 bg-gray-300 mx-1" />
 
         <button
           type="button"
@@ -259,7 +259,7 @@ export default function RichTextEditor({
           </svg>
         </button>
 
-        <div className="w-px h-5 bg-[var(--a3-border)] mx-1" />
+        <div className="w-px h-5 bg-gray-300 mx-1" />
 
         {/* Image buttons */}
         <button
