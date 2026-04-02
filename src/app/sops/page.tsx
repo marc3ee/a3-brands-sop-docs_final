@@ -1,16 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSOPs } from "@/contexts/SOPContext";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 
 function SOPListContent() {
   const { sops, categories, isLoading } = useSOPs();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const categoryFilter = searchParams.get("category") || "";
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchParams.get("q") || "");
+
+  // Sync search input when URL q param changes (e.g. from header search)
+  useEffect(() => {
+    setSearch(searchParams.get("q") || "");
+  }, [searchParams]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearch(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set("q", value);
+    } else {
+      params.delete("q");
+    }
+    router.replace(`/sops?${params.toString()}`);
+  };
 
   const filtered = sops.filter((sop) => {
     const matchesCategory = !categoryFilter || sop.category_name === categoryFilter;
@@ -79,7 +97,7 @@ function SOPListContent() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={handleSearchChange}
             placeholder="Search SOPs by title, description, or content..."
             className="w-full bg-white border border-[#E2E8F0] rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
           />
