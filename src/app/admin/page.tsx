@@ -1,10 +1,11 @@
 "use client";
 
 import { useSOPs } from "@/contexts/SOPContext";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { USER_ROLES, NON_SUPERUSER_ROLES, ROLE_LABELS, type UserRole } from "@/lib/roles";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/contexts/ToastContext";
 
 type Tab = "users" | "visibility" | "audit";
 
@@ -29,6 +30,7 @@ interface AuditRecord {
 export default function AdminPage() {
   const { sops, deleteSOP, categories, refreshSOPs } = useSOPs();
   const router = useRouter();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("users");
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditRecord[]>([]);
@@ -45,6 +47,12 @@ export default function AdminPage() {
   // SOP management
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [filterCat, setFilterCat] = useState("");
+
+  // Visibility matrix state - tracks pending changes before save
+  const [visibilityMap, setVisibilityMap] = useState<Record<string, UserRole[]>>({});
+  const [visibilityDirty, setVisibilityDirty] = useState(false);
+  const [savingVisibility, setSavingVisibility] = useState(false);
+  const [visibilityCatFilter, setVisibilityCatFilter] = useState("");
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -65,6 +73,16 @@ export default function AdminPage() {
     if (tab === "audit") fetchAudit();
     if (tab === "visibility") refreshSOPs();
   }, [tab, fetchUsers, fetchAudit, refreshSOPs]);
+
+  // Initialize visibility map from SOPs when switching to visibility tab
+  useEffect(() => {
+    if (tab === "visibility" && sops.length > 0) {
+      const map: Record<string, UserRole[]> = {};
+      sops.forEach((s) => { map[s.id] = [...s.role_visibility]; });
+      setVisibilityMap(map);
+      setVisibilityDirty(false);
+    }
+  }, [tab, sops]);
 
   const handleRoleChange = (email: string, newRole: UserRole) => {
     setConfirmAction({
@@ -96,24 +114,65 @@ export default function AdminPage() {
     });
   };
 
-  const handleVisibilityChange = (sopId: string, sopTitle: string, role: UserRole, checked: boolean, currentRoles: UserRole[]) => {
-    const newRoles = checked
-      ? [...currentRoles, role]
-      : currentRoles.filter((r) => r !== role);
-
-    setConfirmAction({
-      title: "Change Document Visibility",
-      message: `${checked ? "Grant" : "Remove"} ${ROLE_LABELS[role]} access to "${sopTitle}"?`,
-      onConfirm: async () => {
-        await fetch("/api/admin/sops", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: sopId, role_visibility: newRoles }),
-        });
-        await refreshSOPs();
-      },
+  const toggleVisibility = (sopId: string, role: UserRole) => {
+    setVisibilityMap((prev) => {
+      const current = prev[sopId] || [];
+      const updated = current.includes(role)
+        ? current.filter((r) => r !== role)
+        : [...current, role];
+      return { ...prev, [sopId]: updated };
     });
+    setVisibilityDirty(true);
   };
+
+  const toggleColumnAll = (role: UserRole) => {
+    const targetSops = visibilityCatFilter
+      ? sops.filter((s) => s.category_name === visibilityCatFilter)
+      : sops;
+    const allChecked = targetSops.every((s) => (visibilityMap[s.id] || []).includes(role));
+    setVisibilityMap((prev) => {
+      const next = { ...prev };
+      targetSops.forEach((s) => {
+        const current = next[s.id] || [];
+        next[s.id] = allChecked
+          ? current.filter((r) => r !== role)
+          : current.includes(role) ? current : [...current, role];
+      });
+      return next;
+    });
+    setVisibilityDirty(true);
+  };
+
+  const saveVisibility = async () => {
+    setSavingVisibility(true);
+    const changed = sops.filter((s) => {
+      const original = s.role_visibility.sort().join(",");
+      const updated = (visibilityMap[s.id] || []).sort().join(",");
+      return original !== updated;
+    });
+    for (const s of changed) {
+      await fetch("/api/admin/sops", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: s.id, role_visibility: visibilityMap[s.id] }),
+      });
+    }
+    await refreshSOPs();
+    setSavingVisibility(false);
+    setVisibilityDirty(false);
+    toast(`Updated visibility for ${changed.length} SOP${changed.length === 1 ? "" : "s"}.`);
+  };
+
+  const discardVisibility = () => {
+    const map: Record<string, UserRole[]> = {};
+    sops.forEach((s) => { map[s.id] = [...s.role_visibility]; });
+    setVisibilityMap(map);
+    setVisibilityDirty(false);
+  };
+
+  const filteredVisibilitySops = visibilityCatFilter
+    ? sops.filter((s) => s.category_name === visibilityCatFilter)
+    : sops;
 
   const handleDelete = async (id: string) => {
     await deleteSOP(id);
@@ -232,32 +291,100 @@ export default function AdminPage() {
 
       {/* Document Visibility Tab */}
       {tab === "visibility" && (
-        <div className="space-y-4">
-          {sops.map((sop) => (
-            <div key={sop.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-[var(--text)] mb-1">{sop.title}</h3>
-              <p className="text-xs text-[var(--text-muted)] mb-3">{sop.category_name}</p>
-              <div className="flex flex-wrap gap-3">
-                {NON_SUPERUSER_ROLES.map((role) => {
-                  const checked = sop.role_visibility.includes(role);
-                  return (
-                    <label key={role} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => handleVisibilityChange(sop.id, sop.title, role, !checked, sop.role_visibility)}
-                        className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
-                      />
-                      <span className="text-[var(--text)]">{ROLE_LABELS[role]}</span>
-                    </label>
-                  );
-                })}
-              </div>
+        <div>
+          {/* Toolbar */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <select
+                value={visibilityCatFilter}
+                onChange={(e) => setVisibilityCatFilter(e.target.value)}
+                className="text-sm text-[var(--text)] border border-[var(--border)] rounded-lg px-3 py-1.5 bg-[var(--bg-card)] focus:outline-none focus:border-[var(--primary)]"
+              >
+                <option value="">All Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
+              <span className="text-xs text-[var(--text-muted)]">
+                {filteredVisibilitySops.length} {filteredVisibilitySops.length === 1 ? "document" : "documents"}
+              </span>
             </div>
-          ))}
-          {sops.length === 0 && (
-            <div className="text-center py-12 text-[var(--text-muted)] text-sm">No SOPs found.</div>
-          )}
+            <div className="flex items-center gap-2">
+              {visibilityDirty && (
+                <button
+                  onClick={discardVisibility}
+                  className="px-3 py-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                >
+                  Discard
+                </button>
+              )}
+              <button
+                onClick={saveVisibility}
+                disabled={!visibilityDirty || savingVisibility}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:opacity-50 rounded-lg transition-colors"
+              >
+                {savingVisibility ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+
+          {/* Matrix table */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
+                  <th className="text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider px-4 py-3 sticky left-0 bg-[var(--bg-hover)] min-w-[200px]">
+                    Document
+                  </th>
+                  {NON_SUPERUSER_ROLES.map((role) => {
+                    const allChecked = filteredVisibilitySops.length > 0 && filteredVisibilitySops.every((s) => (visibilityMap[s.id] || []).includes(role));
+                    const someChecked = filteredVisibilitySops.some((s) => (visibilityMap[s.id] || []).includes(role));
+                    return (
+                      <th key={role} className="text-center text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider px-3 py-3 min-w-[90px]">
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className="leading-tight">{ROLE_LABELS[role].replace(" ", "\n")}</span>
+                          <input
+                            type="checkbox"
+                            checked={allChecked}
+                            ref={(el) => { if (el) el.indeterminate = someChecked && !allChecked; }}
+                            onChange={() => toggleColumnAll(role)}
+                            className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] cursor-pointer"
+                            title={`Toggle all for ${ROLE_LABELS[role]}`}
+                          />
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredVisibilitySops.map((sop) => (
+                  <tr key={sop.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                    <td className="px-4 py-3 sticky left-0 bg-[var(--bg-card)]">
+                      <p className="text-sm font-medium text-[var(--text)] truncate max-w-[250px]">{sop.title}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{sop.category_name}</p>
+                    </td>
+                    {NON_SUPERUSER_ROLES.map((role) => {
+                      const checked = (visibilityMap[sop.id] || []).includes(role);
+                      return (
+                        <td key={role} className="text-center px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleVisibility(sop.id, role)}
+                            className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] cursor-pointer"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {sops.length === 0 && (
+              <div className="text-center py-12 text-[var(--text-muted)] text-sm">No SOPs found.</div>
+            )}
+          </div>
         </div>
       )}
 
