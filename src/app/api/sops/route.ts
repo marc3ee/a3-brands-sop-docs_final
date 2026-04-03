@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from("sops")
     .select("*, categories(name)")
-    .order("last_updated", { ascending: false });
+    .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -149,7 +149,7 @@ export function SOPProvider({ children }: { children: ReactNode }) {
         return;
       }
       const data = await res.json();
-      setSOPs((prev) => [rowToSOP(data), ...prev]);
+      setSOPs((prev) => [...prev, rowToSOP(data)]);
     },
     []
   );
