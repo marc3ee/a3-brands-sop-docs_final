@@ -4,7 +4,7 @@ import { useSOPs } from "@/contexts/SOPContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useToast } from "@/contexts/ToastContext";
 
 export default function SOPDetailPage() {
@@ -20,6 +20,58 @@ export default function SOPDetailPage() {
   const [deleteError, setDeleteError] = useState(false);
   const [versions, setVersions] = useState<{ id: string; user_email: string; action: string; details: string | null; created_at: string }[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [htmlHeadings, setHtmlHeadings] = useState<{ id: string; text: string }[]>([]);
+  const hasContentHtml = sop ? !!(sop.content_html && sop.content_html.trim().length > 0) : false;
+
+  // Track active step via IntersectionObserver
+  useEffect(() => {
+    if (!sop) return;
+    const hasSteps = !hasContentHtml && sop.steps.length > 0;
+    const ids = hasSteps
+      ? sop.steps.map((_, i) => `step-${i}`)
+      : htmlHeadings.map((h) => h.id);
+    if (ids.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const idx = ids.indexOf(entry.target.id);
+            if (idx !== -1) setActiveStepIndex(idx);
+          }
+        }
+      },
+      { rootMargin: "-20% 0px -60% 0px" }
+    );
+
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [sop, hasContentHtml, htmlHeadings]);
+
+  // Extract headings from content_html for TOC
+  useEffect(() => {
+    if (!sop || !hasContentHtml || !contentRef.current) return;
+    const headings = contentRef.current.querySelectorAll("h1, h2, h3");
+    const items: { id: string; text: string }[] = [];
+    headings.forEach((el, i) => {
+      const id = `content-heading-${i}`;
+      el.id = id;
+      items.push({ id, text: el.textContent || "" });
+    });
+    setHtmlHeadings(items);
+  }, [sop, hasContentHtml]);
+
+  const tocItems = useMemo(() => {
+    if (!sop) return [];
+    if (hasContentHtml) return htmlHeadings.map((h) => ({ id: h.id, label: h.text }));
+    return sop.steps.map((step, i) => ({ id: `step-${i}`, label: step.title }));
+  }, [sop, hasContentHtml, htmlHeadings]);
 
   // Fetch version history on demand from audit logs
   useEffect(() => {
@@ -77,8 +129,6 @@ export default function SOPDetailPage() {
     );
   }
 
-  const hasContentHtml = sop.content_html && sop.content_html.trim().length > 0;
-
   return (
     <>
       {/* Breadcrumb */}
@@ -132,119 +182,129 @@ export default function SOPDetailPage() {
         </div>
       </div>
 
-      {/* Content HTML (AI-generated SOPs) */}
-      {hasContentHtml && (
-        <div
-          className="sop-content prose prose-blue max-w-none mb-8"
-          dangerouslySetInnerHTML={{ __html: sop.content_html! }}
-        />
-      )}
+      {/* Main content with floating TOC */}
+      <div className={tocItems.length > 2 ? "lg:flex lg:gap-8" : ""}>
+        {/* Content column */}
+        <div className="flex-1 min-w-0">
+          {/* Content HTML (AI-generated SOPs) */}
+          {hasContentHtml && (
+            <div
+              ref={contentRef}
+              className="sop-content prose prose-blue max-w-none mb-8"
+              dangerouslySetInnerHTML={{ __html: sop.content_html! }}
+            />
+          )}
 
-      {/* Steps (manually created SOPs) */}
-      {!hasContentHtml && sop.steps.length > 0 && (
-        <>
-          {/* Table of Contents */}
-          <div className="bg-[var(--bg-hover)] border border-[var(--border)] rounded-xl p-6 mb-8">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">On this page</h2>
-            <ol className="space-y-1.5">
+          {/* Steps (manually created SOPs) */}
+          {!hasContentHtml && sop.steps.length > 0 && (
+            <div className="space-y-10">
               {sop.steps.map((step, i) => (
-                <li key={i}>
-                  <a href={`#step-${i}`} className="text-sm text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors flex items-center gap-2">
-                    <span className="font-mono text-xs text-[var(--primary)]">{i + 1}</span>
-                    {step.title}
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          {/* Steps */}
-          <div className="space-y-10">
-            {sop.steps.map((step, i) => (
-              <section key={i} id={`step-${i}`} className="scroll-mt-8">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--primary-light)] text-[var(--primary)] flex items-center justify-center text-sm font-bold">{i + 1}</span>
-                  <h2 className="text-xl font-bold text-[var(--text)]">{step.title}</h2>
-                </div>
-                <p className="text-[var(--text-muted)] mb-4 leading-relaxed">{step.description}</p>
-
-                {step.richContent && (
-                  <div
-                    className="rich-content mb-4"
-                    dangerouslySetInnerHTML={{ __html: step.richContent }}
-                  />
-                )}
-
-                {step.warning && (
-                  <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-lg px-4 py-3 mb-4 flex gap-3">
-                    <svg className="w-5 h-5 text-[var(--warning-border)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-medium text-[var(--warning-text)]">Warning</p>
-                      <p className="text-sm text-[var(--warning-text)] mt-0.5">{step.warning}</p>
-                    </div>
+                <section key={i} id={`step-${i}`} className="scroll-mt-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--primary-light)] text-[var(--primary)] flex items-center justify-center text-sm font-bold">{i + 1}</span>
+                    <h2 className="text-xl font-bold text-[var(--text)]">{step.title}</h2>
                   </div>
-                )}
+                  <p className="text-[var(--text-muted)] mb-4 leading-relaxed">{step.description}</p>
 
-                {step.substeps && (
-                  <div className="space-y-2 mb-4">
-                    {step.substeps.map((sub, j) => (
-                      <div key={j} className="flex gap-3 items-start">
-                        <div className="flex-shrink-0 w-5 h-5 rounded border border-[var(--border)] bg-[var(--bg-hover)] flex items-center justify-center mt-0.5">
-                          <span className="text-[10px] text-[var(--text-muted)] font-mono">{j + 1}</span>
-                        </div>
-                        <p className="text-sm text-[var(--text-muted)] leading-relaxed">{sub}</p>
+                  {step.richContent && (
+                    <div className="rich-content mb-4" dangerouslySetInnerHTML={{ __html: step.richContent }} />
+                  )}
+
+                  {step.warning && (
+                    <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-lg px-4 py-3 mb-4 flex gap-3">
+                      <svg className="w-5 h-5 text-[var(--warning-border)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--warning-text)]">Warning</p>
+                        <p className="text-sm text-[var(--warning-text)] mt-0.5">{step.warning}</p>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {step.codeExample && (
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-t-lg px-4 py-2">
-                      <span className="text-xs text-gray-400 font-mono">Example</span>
-                      <button
-                        onClick={() => handleCopy(step.codeExample!, i)}
-                        className={`text-xs transition-colors ${copiedIndex === i ? "text-green-400" : "text-gray-400 hover:text-white"}`}
-                      >
-                        {copiedIndex === i ? "Copied!" : "Copy"}
-                      </button>
                     </div>
-                    <pre className="bg-gray-900 border border-t-0 border-gray-700 rounded-b-lg p-4 overflow-x-auto">
-                      <code className="text-sm font-mono text-gray-300 leading-relaxed whitespace-pre">{step.codeExample}</code>
-                    </pre>
-                  </div>
-                )}
+                  )}
 
-                {step.notes && step.notes.length > 0 && (
-                  <div className="bg-[var(--primary-light)] border border-[var(--info-border)] rounded-lg px-4 py-3">
-                    <p className="text-xs font-medium text-[var(--primary)] mb-2 uppercase tracking-wider">Notes</p>
-                    {step.notes.map((note, k) => (
-                      <p key={k} className="text-sm text-[var(--info-text)] leading-relaxed mb-1 last:mb-0">&bull; {note}</p>
-                    ))}
-                  </div>
-                )}
-              </section>
-            ))}
-          </div>
-        </>
-      )}
+                  {step.substeps && (
+                    <div className="space-y-2 mb-4">
+                      {step.substeps.map((sub, j) => (
+                        <div key={j} className="flex gap-3 items-start">
+                          <div className="flex-shrink-0 w-5 h-5 rounded border border-[var(--border)] bg-[var(--bg-hover)] flex items-center justify-center mt-0.5">
+                            <span className="text-[10px] text-[var(--text-muted)] font-mono">{j + 1}</span>
+                          </div>
+                          <p className="text-sm text-[var(--text-muted)] leading-relaxed">{sub}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-      {/* Empty state */}
-      {!hasContentHtml && sop.steps.length === 0 && (
-        <div className="text-center py-12 text-[var(--text-muted)]">
-          <p className="text-lg">This SOP has no content yet.</p>
-          {isSuperuser && (
-            <button
-              onClick={() => router.push(`/admin/edit/${sop.id}`)}
-              className="mt-4 text-sm text-[var(--primary)] hover:text-[var(--primary)]"
-            >
-              Click Edit to add content
-            </button>
+                  {step.codeExample && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-t-lg px-4 py-2">
+                        <span className="text-xs text-gray-400 font-mono">Example</span>
+                        <button
+                          onClick={() => handleCopy(step.codeExample!, i)}
+                          className={`text-xs transition-colors ${copiedIndex === i ? "text-green-400" : "text-gray-400 hover:text-white"}`}
+                        >
+                          {copiedIndex === i ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                      <pre className="bg-gray-900 border border-t-0 border-gray-700 rounded-b-lg p-4 overflow-x-auto">
+                        <code className="text-sm font-mono text-gray-300 leading-relaxed whitespace-pre">{step.codeExample}</code>
+                      </pre>
+                    </div>
+                  )}
+
+                  {step.notes && step.notes.length > 0 && (
+                    <div className="bg-[var(--primary-light)] border border-[var(--info-border)] rounded-lg px-4 py-3">
+                      <p className="text-xs font-medium text-[var(--primary)] mb-2 uppercase tracking-wider">Notes</p>
+                      {step.notes.map((note, k) => (
+                        <p key={k} className="text-sm text-[var(--info-text)] leading-relaxed mb-1 last:mb-0">&bull; {note}</p>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!hasContentHtml && sop.steps.length === 0 && (
+            <div className="text-center py-12 text-[var(--text-muted)]">
+              <p className="text-lg">This SOP has no content yet.</p>
+              {isSuperuser && (
+                <button
+                  onClick={() => router.push(`/admin/edit/${sop.id}`)}
+                  className="mt-4 text-sm text-[var(--primary)] hover:text-[var(--primary)]"
+                >
+                  Click Edit to add content
+                </button>
+              )}
+            </div>
           )}
         </div>
-      )}
+
+        {/* Floating TOC sidebar */}
+        {tocItems.length > 2 && (
+          <aside className="hidden lg:block w-56 flex-shrink-0">
+            <div className="sticky top-20">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">On this page</h3>
+              <nav className="space-y-1">
+                {tocItems.map((item, i) => (
+                  <a
+                    key={item.id}
+                    href={`#${item.id}`}
+                    className={`block text-sm py-1 pl-3 border-l-2 transition-colors truncate ${
+                      activeStepIndex === i
+                        ? "border-[var(--primary)] text-[var(--primary)] font-medium"
+                        : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--border)]"
+                    }`}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </nav>
+            </div>
+          </aside>
+        )}
+      </div>
 
       {/* Version History */}
       <div className="mt-12 pt-6 border-t border-[var(--border)]">

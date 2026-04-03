@@ -8,11 +8,21 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { ROLE_LABELS } from "@/lib/roles";
 import dynamic from "next/dynamic";
 import { useSOPs } from "@/contexts/SOPContext";
+import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 
 const PDFUploadModal = dynamic(() => import("@/components/PDFUploadModal"), { ssr: false });
 
 export default function SOPLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <SidebarProvider>
+      <SOPLayoutInner>{children}</SOPLayoutInner>
+    </SidebarProvider>
+  );
+}
+
+function SOPLayoutInner({ children }: { children: React.ReactNode }) {
   const { user, isLoading, isSuperuser, logout } = useAuth();
+  const { collapsed } = useSidebar();
   const { sops } = useSOPs();
   const router = useRouter();
   const [showUpload, setShowUpload] = useState(false);
@@ -20,6 +30,9 @@ export default function SOPLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const newMenuRef = useRef<HTMLDivElement>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [headerSearch, setHeaderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -47,6 +60,9 @@ export default function SOPLayout({ children }: { children: React.ReactNode }) {
       }
       if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) {
         setShowNewMenu(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -135,7 +151,7 @@ export default function SOPLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main content */}
-      <div className="md:ml-[240px] min-h-screen">
+      <div className={`min-h-screen transition-[margin] duration-200 ${collapsed ? "md:ml-[52px]" : "md:ml-[240px]"}`}>
         {/* Top bar */}
         <header className="sticky top-0 z-30 bg-[var(--bg-card)] border-b border-[var(--border)] px-6 py-3">
           <div className="flex items-center justify-between max-w-5xl mx-auto">
@@ -258,26 +274,38 @@ export default function SOPLayout({ children }: { children: React.ReactNode }) {
 
               <ThemeToggle />
 
-              {/* User avatar + role badge */}
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-[var(--primary-light)] flex items-center justify-center text-[var(--primary)] text-sm font-semibold">
-                  {user.displayName.charAt(0)}
-                </div>
-                <div className="hidden sm:block">
-                  <p className="text-sm font-medium text-[var(--text)] leading-tight">{user.displayName}</p>
-                  <p className="text-xs text-[var(--text-muted)] leading-tight">{ROLE_LABELS[user.role]}</p>
-                </div>
+              {/* User avatar dropdown */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu((prev) => !prev)}
+                  className="flex items-center gap-2 p-1 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-[var(--primary-light)] flex items-center justify-center text-[var(--primary)] text-sm font-semibold">
+                    {user.displayName.charAt(0)}
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium text-[var(--text)] leading-tight">{user.displayName}</p>
+                    <p className="text-xs text-[var(--text-muted)] leading-tight">{ROLE_LABELS[user.role]}</p>
+                  </div>
+                </button>
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-1 w-56 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-lg z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-[var(--border)]">
+                      <p className="text-sm font-medium text-[var(--text)]">{user.displayName}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{user.email}</p>
+                    </div>
+                    <button
+                      onClick={() => { setShowUserMenu(false); setShowLogoutConfirm(true); }}
+                      className="w-full text-left px-4 py-3 text-sm text-[var(--danger-text)] hover:bg-[var(--danger-light)] transition-colors flex items-center gap-3"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Log Out
+                    </button>
+                  </div>
+                )}
               </div>
-
-              <button
-                onClick={() => logout()}
-                className="p-2 text-[var(--text-muted)] hover:text-red-500 transition-colors"
-                title="Logout"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
             </div>
           </div>
         </header>
@@ -291,6 +319,31 @@ export default function SOPLayout({ children }: { children: React.ReactNode }) {
       {/* PDF Upload Modal */}
       {showUpload && (
         <PDFUploadModal isOpen={showUpload} onClose={() => setShowUpload(false)} />
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-[var(--modal-overlay)]" onClick={() => setShowLogoutConfirm(false)} />
+          <div className="relative bg-[var(--bg-card)] rounded-xl shadow-xl p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-[var(--text)] mb-2">Log Out</h3>
+            <p className="text-sm text-[var(--text-muted)] mb-6">Are you sure you want to log out?</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setShowLogoutConfirm(false); logout(); }}
+                className="px-4 py-2 text-sm font-medium text-white bg-[var(--danger)] hover:bg-[var(--danger-hover)] rounded-lg transition-colors"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Back to top button */}

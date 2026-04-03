@@ -8,12 +8,14 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ROLE_LABELS } from "@/lib/roles";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 export default function Sidebar() {
   const { user, logout, isSuperuser } = useAuth();
   const { categories, sops, isLoading } = useSOPs();
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed } = useSidebar();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { resolvedTheme } = useTheme();
 
   const sopsByCategory = (catName: string) =>
@@ -100,8 +102,12 @@ export default function Sidebar() {
             })
           )}
 
+        </nav>
+
+        {/* Bottom section: Admin Panel + User info */}
+        <div className="border-t border-[var(--sidebar-border)]">
           {isSuperuser && (
-            <div className="mb-4 mt-3 pt-4 mx-3 border-t border-[var(--sidebar-border)]">
+            <div className="px-3 pt-4 pb-2">
               <Link
                 href="/admin"
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -117,35 +123,60 @@ export default function Sidebar() {
               </Link>
             </div>
           )}
-        </nav>
 
-        {/* User info */}
-        <div className="px-4 py-5 border-t border-[var(--sidebar-border)]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0" title={`${user?.displayName ?? ""} — ${user?.role ? ROLE_LABELS[user.role] : ""}`}>
-              <div className="w-9 h-9 rounded-full bg-[var(--sidebar-active-bg)] flex items-center justify-center text-[var(--sidebar-active-text)] text-sm font-semibold flex-shrink-0">
-                {user?.displayName?.charAt(0) || "U"}
+          {/* User info */}
+          <div className="px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0" title={`${user?.displayName ?? ""} — ${user?.role ? ROLE_LABELS[user.role] : ""}`}>
+                <div className="w-9 h-9 rounded-full bg-[var(--sidebar-active-bg)] flex items-center justify-center text-[var(--sidebar-active-text)] text-sm font-semibold flex-shrink-0">
+                  {user?.displayName?.charAt(0) || "U"}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--sidebar-text)] truncate">{user?.displayName}</p>
+                  <p className="text-xs text-[var(--sidebar-text-muted)] truncate">{user?.role ? ROLE_LABELS[user.role] : ""}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--sidebar-text)] truncate">{user?.displayName}</p>
-                <p className="text-xs text-[var(--sidebar-text-muted)] truncate">{user?.role ? ROLE_LABELS[user.role] : ""}</p>
-              </div>
+              <button
+                onClick={() => setShowLogoutConfirm(true)}
+                className="p-1.5 rounded-lg text-[var(--sidebar-text-muted)] hover:text-red-400 hover:bg-[var(--sidebar-hover-bg)] transition-colors flex-shrink-0"
+                title="Logout"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
             </div>
-            <button
-              onClick={() => logout()}
-              className="p-1.5 rounded-lg text-[var(--sidebar-text-muted)] hover:text-red-400 hover:bg-[var(--sidebar-hover-bg)] transition-colors flex-shrink-0"
-              title="Logout"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
           </div>
         </div>
       </aside>
 
       {/* Mobile overlay */}
       <div className="md:hidden fixed inset-0 bg-black/30 z-40" onClick={() => setCollapsed(true)} />
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-[var(--modal-overlay)]" onClick={() => setShowLogoutConfirm(false)} />
+          <div className="relative bg-[var(--bg-card)] rounded-xl shadow-xl p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-[var(--text)] mb-2">Log Out</h3>
+            <p className="text-sm text-[var(--text-muted)] mb-6">Are you sure you want to log out?</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setShowLogoutConfirm(false); logout(); }}
+                className="px-4 py-2 text-sm font-medium text-white bg-[var(--danger)] hover:bg-[var(--danger-hover)] rounded-lg transition-colors"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
