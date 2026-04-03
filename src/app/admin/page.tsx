@@ -235,8 +235,36 @@ export default function AdminPage() {
         <div className="space-y-4">
           {sops.map((sop) => (
             <div key={sop.id} className="bg-white border border-gray-200 rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">{sop.title}</h3>
-              <p className="text-xs text-gray-500 mb-3">{sop.category_name}</p>
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">{sop.title}</h3>
+                  <p className="text-xs text-gray-500">{sop.category_name}</p>
+                </div>
+                {deleteConfirm === sop.id ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-red-600">Delete?</span>
+                    <button
+                      onClick={() => handleDelete(sop.id)}
+                      className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(null)}
+                      className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConfirm(sop.id)}
+                    className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
               <div className="flex flex-wrap gap-3">
                 {NON_SUPERUSER_ROLES.map((role) => {
                   const checked = sop.role_visibility.includes(role);

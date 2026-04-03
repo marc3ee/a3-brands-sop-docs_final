@@ -24,11 +24,14 @@ interface SOPEditModalProps {
   sopId: string;
   onClose: () => void;
   onSaved?: () => void;
+  onDelete?: () => void;
 }
 
-export default function SOPEditModal({ sopId, onClose, onSaved }: SOPEditModalProps) {
-  const { sops, updateSOP, categories, addCategory } = useSOPs();
+export default function SOPEditModal({ sopId, onClose, onSaved, onDelete }: SOPEditModalProps) {
+  const { sops, updateSOP, deleteSOP, categories, addCategory } = useSOPs();
   const existing = sops.find((s) => s.id === sopId);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -138,6 +141,14 @@ export default function SOPEditModal({ sopId, onClose, onSaved }: SOPEditModalPr
     onClose();
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    await deleteSOP(sopId);
+    setDeleting(false);
+    onDelete?.();
+    onClose();
+  };
+
   const inputClass =
     "w-full bg-white border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-gray-900";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
@@ -153,6 +164,12 @@ export default function SOPEditModal({ sopId, onClose, onSaved }: SOPEditModalPr
         <div className="sticky top-0 bg-white border-b border-[#E2E8F0] rounded-t-2xl px-6 py-4 flex items-center justify-between z-10">
           <h1 className="text-xl font-bold text-gray-900">Edit SOP</h1>
           <div className="flex gap-2">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="border border-red-200 text-red-600 hover:bg-red-50 text-sm rounded-lg px-4 py-2 transition-colors"
+            >
+              Delete
+            </button>
             <button onClick={onClose} className="bg-white border border-[#E2E8F0] text-sm rounded-lg px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
             <button onClick={handleSave} disabled={saving} className="bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 text-white font-medium text-sm rounded-lg px-4 py-2 transition-colors">
               {saving ? "Saving..." : "Save Changes"}
@@ -298,6 +315,35 @@ export default function SOPEditModal({ sopId, onClose, onSaved }: SOPEditModalPr
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !deleting && setShowDeleteConfirm(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete SOP</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete &ldquo;{existing?.title}&rdquo;? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
