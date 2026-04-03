@@ -146,8 +146,8 @@ export default function AdminPage() {
   const saveVisibility = async () => {
     setSavingVisibility(true);
     const changed = sops.filter((s) => {
-      const original = s.role_visibility.sort().join(",");
-      const updated = (visibilityMap[s.id] || []).sort().join(",");
+      const original = [...s.role_visibility].sort().join(",");
+      const updated = [...(visibilityMap[s.id] || [])].sort().join(",");
       return original !== updated;
     });
     for (const s of changed) {
