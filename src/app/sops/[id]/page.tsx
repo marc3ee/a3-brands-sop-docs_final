@@ -4,22 +4,18 @@ import { useSOPs } from "@/contexts/SOPContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState, useCallback } from "react";
-import dynamic from "next/dynamic";
-
-const SOPContentEditor = dynamic(() => import("@/components/SOPContentEditor"), {
-  ssr: false,
-  loading: () => <div className="fixed inset-0 bg-white z-[100] flex items-center justify-center"><p className="text-gray-500">Loading editor...</p></div>,
-});
+import { useState } from "react";
 
 export default function SOPDetailPage() {
-  const { getSOP, updateSOP, isLoading } = useSOPs();
+  const { getSOP, deleteSOP, isLoading } = useSOPs();
   const { isSuperuser } = useAuth();
   const params = useParams();
   const router = useRouter();
   const sop = getSOP(params.id as string);
-  const [editing, setEditing] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
 
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -27,17 +23,18 @@ export default function SOPDetailPage() {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const handleSave = useCallback(async (html: string) => {
+  const handleDelete = async () => {
     if (!sop) return;
-    await fetch(`/api/sops/${sop.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content_html: html }),
-    });
-    // Refresh the SOP in context without page reload
-    await updateSOP(sop.id, { content_html: html });
-    setEditing(false);
-  }, [sop, updateSOP]);
+    setDeleting(true);
+    setDeleteError(false);
+    const success = await deleteSOP(sop.id);
+    if (success) {
+      router.push("/sops");
+    } else {
+      setDeleting(false);
+      setDeleteError(true);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -64,18 +61,6 @@ export default function SOPDetailPage() {
     );
   }
 
-  // Show editor overlay
-  if (editing && sop.content_html !== null) {
-    return (
-      <SOPContentEditor
-        sopId={sop.id}
-        initialContent={sop.content_html}
-        onSave={handleSave}
-        onClose={() => setEditing(false)}
-      />
-    );
-  }
-
   const hasContentHtml = sop.content_html && sop.content_html.trim().length > 0;
 
   return (
@@ -96,15 +81,26 @@ export default function SOPDetailPage() {
         <div className="flex items-start justify-between">
           <h1 className="text-3xl font-bold text-gray-900 mb-3">{sop.title}</h1>
           {isSuperuser && (
-            <button
-              onClick={() => setEditing(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Edit
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/admin/edit/${sop.id}`)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            </div>
           )}
         </div>
         <p className="text-gray-500 mb-4">{sop.description}</p>
@@ -225,7 +221,7 @@ export default function SOPDetailPage() {
           <p className="text-lg">This SOP has no content yet.</p>
           {isSuperuser && (
             <button
-              onClick={() => setEditing(true)}
+              onClick={() => router.push(`/admin/edit/${sop.id}`)}
               className="mt-4 text-sm text-blue-600 hover:text-blue-700"
             >
               Click Edit to add content
@@ -237,6 +233,38 @@ export default function SOPDetailPage() {
       <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
         <Link href="/sops" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">&larr; Back to all SOPs</Link>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !deleting && setShowDeleteConfirm(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete SOP</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete <strong>&ldquo;{sop.title}&rdquo;</strong>? This action cannot be undone.
+            </p>
+            {deleteError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">Failed to delete SOP. Please try again.</p>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

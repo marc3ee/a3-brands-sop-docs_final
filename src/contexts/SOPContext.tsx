@@ -47,7 +47,7 @@ interface SOPContextType {
     steps: SOPStep[];
     content_html?: string;
     role_visibility?: UserRole[];
-  }) => Promise<void>;
+  }) => Promise<SOP | null>;
   updateSOP: (
     id: string,
     updates: Partial<{
@@ -61,7 +61,7 @@ interface SOPContextType {
       role_visibility: UserRole[];
     }>
   ) => Promise<void>;
-  deleteSOP: (id: string) => Promise<void>;
+  deleteSOP: (id: string) => Promise<boolean>;
   getSOP: (slug: string) => SOP | undefined;
   addCategory: (name: string) => Promise<Category | null>;
   refreshSOPs: () => Promise<void>;
@@ -146,10 +146,12 @@ export function SOPProvider({ children }: { children: ReactNode }) {
       if (!res.ok) {
         const { error } = await res.json();
         console.error("Error adding SOP:", error);
-        return;
+        return null;
       }
       const data = await res.json();
-      setSOPs((prev) => [rowToSOP(data), ...prev]);
+      const newSOP = rowToSOP(data);
+      setSOPs((prev) => [newSOP, ...prev]);
+      return newSOP;
     },
     []
   );
@@ -184,14 +186,15 @@ export function SOPProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const deleteSOP = useCallback(async (id: string) => {
+  const deleteSOP = useCallback(async (id: string): Promise<boolean> => {
     const res = await fetch(`/api/sops/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const { error } = await res.json();
       console.error("Error deleting SOP:", error);
-      return;
+      return false;
     }
     setSOPs((prev) => prev.filter((s) => s.id !== id));
+    return true;
   }, []);
 
   const getSOP = useCallback(

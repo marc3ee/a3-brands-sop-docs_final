@@ -35,6 +35,7 @@ export default function EditSOPPage() {
   const { sops, addSOP, updateSOP, categories, addCategory } = useSOPs();
   const isNew = params.id === "new";
   const existing = !isNew ? sops.find((s) => s.id === params.id) : undefined;
+  const backUrl = existing ? `/sops/${existing.slug}` : "/sops";
 
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -42,9 +43,11 @@ export default function EditSOPPage() {
   const [description, setDescription] = useState("");
   const [version, setVersion] = useState("1.0");
   const [tags, setTags] = useState("");
+  const [contentHtml, setContentHtml] = useState("");
   const [steps, setSteps] = useState<SOPStep[]>([{ ...emptyStep, substeps: [""] }]);
   const [saving, setSaving] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([0]));
+  const hasContentHtml = existing?.content_html && existing.content_html.trim().length > 0;
 
   useEffect(() => {
     if (existing) {
@@ -53,6 +56,7 @@ export default function EditSOPPage() {
       setDescription(existing.description);
       setVersion(existing.version);
       setTags(existing.tags.join(", "));
+      setContentHtml(existing.content_html || "");
       setSteps(existing.steps.map((s) => ({ ...s, substeps: s.substeps || [""], richContent: s.richContent || "" })));
       setExpandedSteps(new Set([0]));
     }
@@ -131,7 +135,7 @@ export default function EditSOPPage() {
     const tagsArray = tags.split(",").map((t) => t.trim()).filter(Boolean);
 
     if (isNew) {
-      await addSOP({
+      const created = await addSOP({
         slug: generateSlug(title),
         title,
         category_id: finalCategoryId,
@@ -139,7 +143,9 @@ export default function EditSOPPage() {
         version,
         tags: tagsArray,
         steps: cleanedSteps,
+        content_html: contentHtml || undefined,
       });
+      router.push(created ? `/sops/${created.slug}` : "/sops");
     } else {
       await updateSOP(params.id as string, {
         title,
@@ -148,9 +154,10 @@ export default function EditSOPPage() {
         version,
         tags: tagsArray,
         steps: cleanedSteps,
+        content_html: contentHtml || undefined,
       });
+      router.push(backUrl);
     }
-    router.push("/admin");
   };
 
   const inputClass =
@@ -162,14 +169,14 @@ export default function EditSOPPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <nav className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-            <Link href="/admin" className="hover:text-blue-600">Admin</Link>
+            <Link href={backUrl} className="hover:text-blue-600">{existing ? existing.title : "SOPs"}</Link>
             <span>/</span>
-            <span className="text-gray-900">{isNew ? "New SOP" : "Edit SOP"}</span>
+            <span className="text-gray-900">{isNew ? "New SOP" : "Edit"}</span>
           </nav>
           <h1 className="text-2xl font-bold text-gray-900">{isNew ? "Create New SOP" : "Edit SOP"}</h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => router.push("/admin")} className="bg-white border border-[#E2E8F0] text-sm rounded-lg px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={() => router.push(backUrl)} className="bg-white border border-[#E2E8F0] text-sm rounded-lg px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 text-white font-medium text-sm rounded-lg px-4 py-2.5 transition-colors">
             {saving ? "Saving..." : isNew ? "Create SOP" : "Save Changes"}
           </button>
@@ -212,6 +219,19 @@ export default function EditSOPPage() {
             </div>
           </div>
         </div>
+
+        {/* Content HTML (for AI-generated SOPs) */}
+        {hasContentHtml && (
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Content</h2>
+            <p className="text-xs text-gray-500 mb-4">This SOP uses rich HTML content (e.g. generated from a PDF upload).</p>
+            <RichTextEditor
+              content={contentHtml}
+              onChange={setContentHtml}
+              placeholder="Edit the SOP content here..."
+            />
+          </div>
+        )}
 
         {/* Steps */}
         <div className="space-y-4">
@@ -305,7 +325,7 @@ export default function EditSOPPage() {
         </div>
 
         <div className="flex justify-end gap-2 pt-4">
-          <button onClick={() => router.push("/admin")} className="bg-white border border-[#E2E8F0] text-sm rounded-lg px-6 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={() => router.push(backUrl)} className="bg-white border border-[#E2E8F0] text-sm rounded-lg px-6 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 text-white font-medium text-sm rounded-lg px-6 py-2.5 transition-colors">
             {saving ? "Saving..." : isNew ? "Create SOP" : "Save Changes"}
           </button>
