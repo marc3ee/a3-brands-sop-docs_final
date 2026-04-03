@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useSOPs } from "@/contexts/SOPContext";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
   const { resolvedTheme } = useTheme();
+  const { refreshSOPs } = useSOPs();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +28,7 @@ export default function LoginPage() {
       setError(err);
       setLoading(false);
     } else {
+      await refreshSOPs();
       router.push("/sops");
     }
   };

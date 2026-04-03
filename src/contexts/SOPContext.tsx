@@ -94,7 +94,6 @@ export function SOPProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [sops, setSOPs] = useState<SOP[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [authed, setAuthed] = useState(false);
 
   const refreshSOPs = useCallback(async () => {
     setIsLoading(true);
@@ -118,7 +117,6 @@ export function SOPProvider({ children }: { children: ReactNode }) {
       .then((r) => r.json())
       .then(({ user }) => {
         if (user) {
-          setAuthed(true);
           refreshSOPs();
         } else {
           setIsLoading(false);
