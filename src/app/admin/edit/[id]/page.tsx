@@ -32,7 +32,7 @@ const emptyStep: SOPStep = {
 export default function EditSOPPage() {
   const params = useParams();
   const router = useRouter();
-  const { sops, addSOP, updateSOP, categories, addCategory } = useSOPs();
+  const { sops, addSOP, updateSOP, categories, addCategory, isLoading } = useSOPs();
   const isNew = params.id === "new";
   const existing = !isNew ? sops.find((s) => s.id === params.id) : undefined;
   const backUrl = existing ? `/sops/${existing.slug}` : "/sops";
@@ -114,12 +114,26 @@ export default function EditSOPPage() {
     );
   };
 
+  const [error, setError] = useState("");
+
   const handleSave = async () => {
+    setError("");
+
+    if (!title.trim()) {
+      setError("Title is required.");
+      return;
+    }
+
+    if (!categoryId && !newCategory.trim()) {
+      setError("Please select a category or create a new one.");
+      return;
+    }
+
     setSaving(true);
     let finalCategoryId = categoryId;
 
-    if (newCategory) {
-      const created = await addCategory(newCategory);
+    if (newCategory.trim()) {
+      const created = await addCategory(newCategory.trim());
       finalCategoryId = created?.id || categoryId;
     }
 
@@ -134,35 +148,73 @@ export default function EditSOPPage() {
 
     const tagsArray = tags.split(",").map((t) => t.trim()).filter(Boolean);
 
-    if (isNew) {
-      const created = await addSOP({
-        slug: generateSlug(title),
-        title,
-        category_id: finalCategoryId,
-        description,
-        version,
-        tags: tagsArray,
-        steps: cleanedSteps,
-        content_html: contentHtml || undefined,
-      });
-      router.push(created ? `/sops/${created.slug}` : "/sops");
-    } else {
-      await updateSOP(params.id as string, {
-        title,
-        category_id: finalCategoryId,
-        description,
-        version,
-        tags: tagsArray,
-        steps: cleanedSteps,
-        content_html: contentHtml || undefined,
-      });
-      router.push(backUrl);
+    try {
+      if (isNew) {
+        const created = await addSOP({
+          slug: generateSlug(title),
+          title,
+          category_id: finalCategoryId,
+          description,
+          version,
+          tags: tagsArray,
+          steps: cleanedSteps,
+          content_html: contentHtml || undefined,
+        });
+        router.push(created ? `/sops/${created.slug}` : "/sops");
+      } else {
+        await updateSOP(params.id as string, {
+          title,
+          category_id: finalCategoryId,
+          description,
+          version,
+          tags: tagsArray,
+          steps: cleanedSteps,
+          content_html: contentHtml || undefined,
+        });
+        router.push(backUrl);
+      }
+    } catch {
+      setError("Failed to save SOP. Please try again.");
+      setSaving(false);
     }
   };
 
   const inputClass =
     "w-full bg-white border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-gray-900";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
+
+  // Show loading skeleton while SOP data is loading
+  if (isLoading && !isNew) {
+    return (
+      <div className="animate-pulse space-y-6">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="h-4 bg-gray-200 rounded w-32 mb-2" />
+            <div className="h-8 bg-gray-200 rounded w-48" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-10 bg-gray-200 rounded-lg w-20" />
+            <div className="h-10 bg-gray-200 rounded-lg w-32" />
+          </div>
+        </div>
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 space-y-4">
+          <div className="h-5 bg-gray-200 rounded w-40 mb-4" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 h-10 bg-gray-100 rounded-lg" />
+            <div className="h-10 bg-gray-100 rounded-lg" />
+            <div className="h-10 bg-gray-100 rounded-lg" />
+            <div className="h-10 bg-gray-100 rounded-lg" />
+            <div className="h-10 bg-gray-100 rounded-lg" />
+            <div className="col-span-2 h-20 bg-gray-100 rounded-lg" />
+          </div>
+        </div>
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
+          <div className="h-5 bg-gray-200 rounded w-24 mb-4" />
+          <div className="h-12 bg-gray-100 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -182,6 +234,10 @@ export default function EditSOPPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>
+      )}
 
       <div className="space-y-6">
         {/* Basic Info */}
