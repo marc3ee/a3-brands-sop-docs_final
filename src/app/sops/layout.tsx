@@ -18,6 +18,7 @@ export default function SOPLayout({ children }: { children: React.ReactNode }) {
   const [showUpload, setShowUpload] = useState(false);
   const [showNewMenu, setShowNewMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const newMenuRef = useRef<HTMLDivElement>(null);
   const [headerSearch, setHeaderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -62,6 +63,15 @@ export default function SOPLayout({ children }: { children: React.ReactNode }) {
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Show back-to-top button on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 400);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
@@ -281,6 +291,20 @@ export default function SOPLayout({ children }: { children: React.ReactNode }) {
       {/* PDF Upload Modal */}
       {showUpload && (
         <PDFUploadModal isOpen={showUpload} onClose={() => setShowUpload(false)} />
+      )}
+
+      {/* Back to top button */}
+      {showBackToTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 z-40 bg-[var(--bg-card)] border border-[var(--border)] shadow-lg rounded-full px-4 py-2.5 flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--primary)] hover:border-[var(--primary)] transition-all"
+          title="Back to top"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+          Back to top
+        </button>
       )}
 
       {/* Mobile sidebar overlay */}

@@ -11,18 +11,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const supabase = createServerClient();
   const { id } = await params;
   const body = await req.json();
+  const { change_note, ...updateData } = body;
   const today = new Date().toISOString().split("T")[0];
 
   const { data, error } = await supabase
     .from("sops")
-    .update({ ...body, last_updated: today, updated_at: new Date().toISOString() })
+    .update({ ...updateData, last_updated: today, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("*, categories(name)")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await logAudit(user, "SOP_EDITED", data.id, data.title);
+  const detail = change_note
+    ? `v${data.version || "1.0"} — ${change_note}`
+    : `v${data.version || "1.0"}`;
+  await logAudit(user, "SOP_EDITED", data.id, data.title, detail);
 
   return NextResponse.json(data);
 }

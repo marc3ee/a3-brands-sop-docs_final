@@ -4,7 +4,7 @@ import { useSOPs } from "@/contexts/SOPContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/contexts/ToastContext";
 
 export default function SOPDetailPage() {
@@ -18,6 +18,18 @@ export default function SOPDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
+  const [versions, setVersions] = useState<{ id: string; user_email: string; action: string; details: string | null; created_at: string }[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Fetch version history on demand from audit logs
+  useEffect(() => {
+    if (showHistory && sop && versions.length === 0) {
+      fetch(`/api/sops/${sop.id}/history`)
+        .then((r) => r.ok ? r.json() : [])
+        .then((data) => setVersions(Array.isArray(data) ? data : []))
+        .catch(() => {});
+    }
+  }, [showHistory, sop, versions.length]);
 
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -234,7 +246,50 @@ export default function SOPDetailPage() {
         </div>
       )}
 
-      <div className="mt-12 pt-6 border-t border-[var(--border)] flex justify-between">
+      {/* Version History */}
+      <div className="mt-12 pt-6 border-t border-[var(--border)]">
+        <button
+          onClick={() => setShowHistory((prev) => !prev)}
+          className="flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors mb-4"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {showHistory ? "Hide" : "Show"} Version History
+          <svg className={`w-3 h-3 transition-transform ${showHistory ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showHistory && (
+          <div className="mb-6">
+            {versions.length > 0 ? (
+              <div className="space-y-3">
+                {versions.map((v, i) => (
+                  <div key={v.id} className="flex gap-4 items-start">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${i === 0 ? "bg-[var(--primary)]" : "bg-[var(--border)]"}`} />
+                      {i < versions.length - 1 && <div className="w-px h-full bg-[var(--border)] min-h-[40px]" />}
+                    </div>
+                    <div className="pb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-[var(--text)]">{v.action === "SOP_CREATED" ? "Created" : "Updated"}</span>
+                        <span className="text-xs text-[var(--text-muted)]">&mdash; {new Date(v.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</span>
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">by {v.user_email}</p>
+                      {v.details && (
+                        <p className="text-sm text-[var(--text-muted)] mt-1 italic">&ldquo;{v.details}&rdquo;</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--text-muted)]">No version history available.</p>
+            )}
+          </div>
+        )}
+
         <Link href="/sops" className="text-sm text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">&larr; Back to all SOPs</Link>
       </div>
 

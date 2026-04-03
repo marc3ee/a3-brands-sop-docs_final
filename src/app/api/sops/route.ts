@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await logAudit(user, "SOP_CREATED", data.id, data.title);
+  await logAudit(user, "SOP_CREATED", data.id, data.title, `v${data.version || "1.0"} — Initial version`);
 
   return NextResponse.json(data, { status: 201 });
 }

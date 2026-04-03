@@ -59,6 +59,7 @@ interface SOPContextType {
       steps: SOPStep[];
       content_html: string;
       role_visibility: UserRole[];
+      change_note: string;
     }>
   ) => Promise<void>;
   deleteSOP: (id: string) => Promise<boolean>;
@@ -168,6 +169,7 @@ export function SOPProvider({ children }: { children: ReactNode }) {
         steps: SOPStep[];
         content_html: string;
         role_visibility: UserRole[];
+        change_note: string;
       }>
     ) => {
       const res = await fetch(`/api/sops/${id}`, {

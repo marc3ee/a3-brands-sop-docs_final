@@ -47,6 +47,7 @@ export default function EditSOPPage() {
   const [tags, setTags] = useState("");
   const [contentHtml, setContentHtml] = useState("");
   const [steps, setSteps] = useState<SOPStep[]>([{ ...emptyStep, substeps: [""] }]);
+  const [changeNote, setChangeNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([0]));
   const hasContentHtml = existing?.content_html && existing.content_html.trim().length > 0;
@@ -173,6 +174,7 @@ export default function EditSOPPage() {
           tags: tagsArray,
           steps: cleanedSteps,
           content_html: contentHtml || undefined,
+          change_note: changeNote || undefined,
         });
         toast("SOP updated successfully.");
         router.push(backUrl);
@@ -384,6 +386,20 @@ export default function EditSOPPage() {
             );
           })}
         </div>
+
+        {/* Change note (only for edits) */}
+        {!isNew && (
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6">
+            <label className={labelClass}>Change Note <span className="text-[var(--text-muted)] font-normal">(optional - describe what you changed)</span></label>
+            <input
+              type="text"
+              value={changeNote}
+              onChange={(e) => setChangeNote(e.target.value)}
+              className={inputClass}
+              placeholder='e.g. "Updated deployment steps for new CMS platform"'
+            />
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-4">
           <button onClick={() => router.push(backUrl)} className="bg-[var(--bg-card)] border border-[var(--border)] text-sm rounded-lg px-6 py-2.5 text-[var(--text)] hover:bg-[var(--bg-hover)] transition-colors">Cancel</button>
