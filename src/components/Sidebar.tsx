@@ -38,19 +38,39 @@ function SidebarContent() {
       : null;
   const effectiveRole = previewedRole ?? (user?.role ?? null);
 
-  // SUPERUSER without an ?as= preview sees everything (admin view).
-  // Everyone else sees only SOPs whose role_visibility includes their effective role.
-  const visibleSops =
-    isSuperuser && !previewedRole
-      ? sops
-      : effectiveRole
-        ? sops.filter((s) => s.role_visibility?.includes(effectiveRole))
-        : [];
+  // SUPERUSER's sidebar always shows everything (the ?as= preview only affects page content, not the sidebar).
+  // Everyone else sees only SOPs whose role_visibility includes their own role.
+  const visibleSops = isSuperuser
+    ? sops
+    : effectiveRole
+      ? sops.filter((s) => s.role_visibility?.includes(effectiveRole))
+      : [];
 
   const sopsByCategory = (catName: string) =>
     visibleSops.filter((s) => s.category_name === catName);
 
+  const sopsByRole = (role: UserRole) =>
+    visibleSops
+      .filter((s) => s.role_visibility?.includes(role))
+      .sort(
+        (a, b) =>
+          a.category_name.localeCompare(b.category_name) ||
+          a.title.localeCompare(b.title),
+      );
+
+  const unassignedSops = visibleSops
+    .filter((s) => !s.role_visibility || s.role_visibility.length === 0)
+    .sort((a, b) => a.title.localeCompare(b.title));
+
+  // Admin (SUPERUSER) always groups by user role with collapsible dropdowns,
+  // regardless of any ?as= preview. Everyone else groups by category.
+  const groupByRole = isSuperuser;
+
   const isActive = (slug: string) => pathname === `/sops/${slug}`;
+
+  const [openRoles, setOpenRoles] = useState<Record<string, boolean>>({});
+  const toggleRole = (key: string) =>
+    setOpenRoles((prev) => ({ ...prev, [key]: !prev[key] }));
 
   if (collapsed) {
     return (
@@ -102,6 +122,127 @@ function SidebarContent() {
                 </div>
               ))}
             </div>
+          ) : groupByRole ? (
+            <>
+              {NON_SUPERUSER_ROLES.map((role) => {
+                const roleSOPs = sopsByRole(role);
+                if (roleSOPs.length === 0) return null;
+                const isOpen = openRoles[role] ?? false;
+                return (
+                  <div key={role} className="mb-1">
+                    <button
+                      onClick={() => toggleRole(role)}
+                      aria-expanded={isOpen}
+                      className={`w-full flex items-center justify-between text-[15px] font-semibold tracking-tight px-4 py-2.5 mt-2 first:mt-0 border-l-2 transition-colors ${
+                        isOpen
+                          ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] border-[var(--sidebar-active-text)]"
+                          : "text-[var(--sidebar-text)] border-transparent hover:bg-[var(--sidebar-hover-bg)]"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{ROLE_LABELS[role]}</span>
+                        <span
+                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            isOpen
+                              ? "bg-[var(--sidebar-active-text)]/15 text-[var(--sidebar-active-text)]"
+                              : "bg-[var(--sidebar-hover-bg)] text-[var(--sidebar-text-muted)]"
+                          }`}
+                        >
+                          {roleSOPs.length}
+                        </span>
+                      </span>
+                      <svg
+                        className={`w-4 h-4 transition-transform ${
+                          isOpen
+                            ? "rotate-90 text-[var(--sidebar-active-text)]"
+                            : "text-[var(--sidebar-text-muted)]"
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    {isOpen && (
+                      <div className="space-y-0.5 px-2 py-1">
+                        {roleSOPs.map((sop) => (
+                          <Link
+                            key={`${role}-${sop.id}`}
+                            href={`/sops/${sop.slug}`}
+                            className={`block px-3 py-1.5 rounded-lg text-[13px] leading-snug transition-colors ${
+                              isActive(sop.slug)
+                                ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] font-medium"
+                                : "text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]"
+                            }`}
+                          >
+                            {sop.title}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {unassignedSops.length > 0 && (() => {
+                const isOpen = openRoles["__unassigned"] ?? false;
+                return (
+                  <div className="mb-1">
+                    <button
+                      onClick={() => toggleRole("__unassigned")}
+                      aria-expanded={isOpen}
+                      className={`w-full flex items-center justify-between text-[15px] font-semibold tracking-tight px-4 py-2.5 mt-2 border-l-2 transition-colors ${
+                        isOpen
+                          ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] border-[var(--sidebar-active-text)]"
+                          : "text-[var(--sidebar-text)] border-transparent hover:bg-[var(--sidebar-hover-bg)]"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>Unassigned</span>
+                        <span
+                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            isOpen
+                              ? "bg-[var(--sidebar-active-text)]/15 text-[var(--sidebar-active-text)]"
+                              : "bg-[var(--sidebar-hover-bg)] text-[var(--sidebar-text-muted)]"
+                          }`}
+                        >
+                          {unassignedSops.length}
+                        </span>
+                      </span>
+                      <svg
+                        className={`w-4 h-4 transition-transform ${
+                          isOpen
+                            ? "rotate-90 text-[var(--sidebar-active-text)]"
+                            : "text-[var(--sidebar-text-muted)]"
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    {isOpen && (
+                      <div className="space-y-0.5 px-2 py-1">
+                        {unassignedSops.map((sop) => (
+                          <Link
+                            key={`unassigned-${sop.id}`}
+                            href={`/sops/${sop.slug}`}
+                            className={`block px-3 py-1.5 rounded-lg text-[13px] leading-snug transition-colors ${
+                              isActive(sop.slug)
+                                ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] font-medium"
+                                : "text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]"
+                            }`}
+                          >
+                            {sop.title}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </>
           ) : (
             categories.map((cat) => {
               const catSOPs = sopsByCategory(cat.name);
