@@ -3,11 +3,43 @@ import { requireSuperuser } from "@/lib/auth-guard";
 import { createServerClient } from "@/lib/supabase-server";
 import { logAudit } from "@/lib/audit";
 import Anthropic from "@anthropic-ai/sdk";
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import type { SOPStep } from "@/types/database";
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+// Claude's document API limit is 32MB per PDF.
+const MAX_FILE_SIZE = 32 * 1024 * 1024;
 
-const SOP_SYSTEM_PROMPT = `You are an SOP documentation specialist. Given the raw text of a PDF document, extract and reformat it into a clean, structured SOP. Output format: Title (H1), Purpose (paragraph), Scope (bullet list), Roles Involved (bullet list), Step-by-Step Procedure (numbered list with sub-steps), Notes & Warnings (callout blocks). Do not fabricate steps. Use only what is in the source text. Output valid HTML only — no markdown. Use semantic HTML tags: <h1>, <h2>, <p>, <ul>, <ol>, <li>, <blockquote>, <strong>, <em>, <code>. For warnings, wrap them in <blockquote class="warning">. For notes, wrap them in <blockquote class="note">.`;
+const SOP_SYSTEM_PROMPT = `You are a document transcriber. You will be given a PDF (which may include scanned pages, screenshots, diagrams, or tables). Your job is to faithfully transcribe its contents and place them into the JSON structure below — NOT to author or rewrite an SOP.
+
+Return ONLY a JSON object — no prose, no markdown fences, no explanation — matching this exact shape:
+
+{
+  "title": string,                  // copy the document's own title verbatim (or its main heading if no explicit title)
+  "description": string,            // copy any subtitle / purpose / overview sentence verbatim from the document; "" if none exists
+  "steps": [
+    {
+      "title": string,              // copy the section/step heading verbatim from the document
+      "description": string,        // copy the body text under that heading verbatim
+      "substeps": string[]?,        // copy bulleted/numbered sub-items verbatim, in order
+      "notes": string[]?,           // copy items the document itself marks as notes/captions/callouts
+      "warning": string?,           // copy items the document itself marks as warnings/cautions
+      "codeExample": string?        // copy any code, command, URL, or template block verbatim
+    }
+  ]
+}
+
+Strict rules — read carefully:
+- TRANSCRIBE, DO NOT REPHRASE. Use the exact wording from the document. Do not paraphrase, summarize, soften, or convert to imperative voice.
+- DO NOT INVENT CONTENT. If the document has no purpose statement, leave description as "". If a section has no body text, omit "description"… actually since "description" is required, copy the section heading text again rather than inventing.
+- DO NOT ADD STRUCTURE THAT ISN'T THERE. No fabricated "Purpose", "Scope", "Roles", "Prerequisites" sections unless those exact sections exist in the document.
+- PRESERVE ORDER. Steps appear in the same order as the source document.
+- PRESERVE GRANULARITY. If the document has 7 sections, return 7 steps. Do not merge or split. Do not skip sections.
+- Read text inside screenshots/scanned pages and transcribe it the same way as native text. Treat a screenshot of a workflow diagram as a step whose description is the diagram's labels/caption.
+- Only populate "warning" / "notes" if the source document explicitly marks something as a warning, caution, note, or tip. Do not reclassify normal body text into these slots.
+- Plain text only in string fields (no HTML, no markdown).
+- Omit empty optional fields entirely (do not emit empty strings or empty arrays).
+- Output must be valid JSON parseable by JSON.parse — no trailing commas, no comments.
+
+Your output is an exact mirror of the source document, just placed into this JSON shape.`;
 
 function generateSlug(title: string): string {
   return title
@@ -16,12 +48,47 @@ function generateSlug(title: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function extractTitleFromHtml(html: string): string {
-  const match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
-  if (match) {
-    return match[1].replace(/<[^>]+>/g, "").trim();
+function extractJson(text: string): string {
+  let t = text.trim();
+  const fence = t.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fence) t = fence[1].trim();
+  const start = t.indexOf("{");
+  const end = t.lastIndexOf("}");
+  if (start !== -1 && end !== -1 && end > start) {
+    return t.slice(start, end + 1);
   }
-  return "Untitled SOP";
+  return t;
+}
+
+interface ParsedSOP {
+  title: string;
+  description: string;
+  steps: SOPStep[];
+}
+
+function sanitizeSteps(raw: unknown): SOPStep[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((s): SOPStep | null => {
+      if (!s || typeof s !== "object") return null;
+      const o = s as Record<string, unknown>;
+      const title = typeof o.title === "string" ? o.title.trim() : "";
+      const description = typeof o.description === "string" ? o.description.trim() : "";
+      if (!title || !description) return null;
+      const step: SOPStep = { title, description };
+      if (Array.isArray(o.substeps)) {
+        const subs = o.substeps.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+        if (subs.length) step.substeps = subs;
+      }
+      if (Array.isArray(o.notes)) {
+        const notes = o.notes.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+        if (notes.length) step.notes = notes;
+      }
+      if (typeof o.warning === "string" && o.warning.trim()) step.warning = o.warning.trim();
+      if (typeof o.codeExample === "string" && o.codeExample.trim()) step.codeExample = o.codeExample;
+      return step;
+    })
+    .filter((s): s is SOPStep => s !== null);
 }
 
 export async function POST(req: NextRequest) {
@@ -39,58 +106,73 @@ export async function POST(req: NextRequest) {
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "File exceeds 50MB limit." }, { status: 400 });
+      return NextResponse.json({ error: "File exceeds 32MB limit." }, { status: 400 });
     }
 
     if (file.type !== "application/pdf") {
       return NextResponse.json({ error: "Only PDF files are accepted." }, { status: 400 });
     }
 
-    // Extract text from PDF using pdfjs-dist directly (no worker needed server-side)
+    // Send the PDF directly to Claude as a document block. Claude reads both
+    // the embedded text layer AND the visual content (screenshots, scanned
+    // pages, diagrams), so image-based PDFs work without a separate OCR step.
     const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjs.getDocument({
-      data: new Uint8Array(arrayBuffer),
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    });
-    const pdf = await loadingTask.promise;
-    const textParts: string[] = [];
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .filter((item: Record<string, unknown>) => "str" in item)
-        .map((item: Record<string, unknown>) => item.str as string)
-        .join(" ");
-      textParts.push(pageText);
-    }
-    const rawText = textParts.join("\n");
+    const base64Pdf = Buffer.from(arrayBuffer).toString("base64");
 
-    if (!rawText || rawText.trim().length === 0) {
-      return NextResponse.json({ error: "Could not extract text from PDF. The file may be image-based or empty." }, { status: 400 });
-    }
-
-    // Send to Anthropic API
     const anthropic = new Anthropic();
 
     const message = await anthropic.messages.create({
-      model: "claude-opus-4-5-20250514",
+      model: "claude-opus-4-6",
       max_tokens: 8192,
       system: SOP_SYSTEM_PROMPT,
       messages: [
         {
           role: "user",
-          content: `Here is the raw text extracted from a PDF document. Please convert it into a well-structured SOP in HTML format:\n\n${rawText}`,
+          content: [
+            {
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: base64Pdf,
+              },
+            },
+            {
+              type: "text",
+              text: "Transcribe the attached PDF into the JSON structure described in the system prompt. Use the document's own wording verbatim. Do not paraphrase, do not invent sections, do not skip sections. Read text inside screenshots and scanned pages and include it the same way.",
+            },
+          ],
         },
       ],
     });
 
     const contentBlock = message.content[0];
-    const contentHtml = contentBlock.type === "text" ? contentBlock.text : "";
+    const rawResponse = contentBlock.type === "text" ? contentBlock.text : "";
 
-    // Extract title from generated HTML
-    const title = extractTitleFromHtml(contentHtml);
+    let parsed: ParsedSOP;
+    try {
+      const jsonText = extractJson(rawResponse);
+      const obj = JSON.parse(jsonText) as Record<string, unknown>;
+      parsed = {
+        title: typeof obj.title === "string" && obj.title.trim() ? obj.title.trim() : "Untitled SOP",
+        description: typeof obj.description === "string" ? obj.description.trim() : "",
+        steps: sanitizeSteps(obj.steps),
+      };
+    } catch {
+      return NextResponse.json(
+        { error: "AI returned an unparseable response. Please try again or use manual entry." },
+        { status: 502 }
+      );
+    }
+
+    if (parsed.steps.length === 0) {
+      return NextResponse.json(
+        { error: "Could not extract any structured steps from this PDF. Try a more clearly formatted document." },
+        { status: 422 }
+      );
+    }
+
+    const title = parsed.title;
     const slug = generateSlug(title) + "-" + Date.now().toString(36);
 
     // Get or create a default category for uploaded SOPs
@@ -121,11 +203,11 @@ export async function POST(req: NextRequest) {
         slug,
         title,
         category_id: categoryId,
-        description: `SOP generated from uploaded PDF: ${file.name}`,
+        description: parsed.description || `SOP generated from uploaded PDF: ${file.name}`,
         version: "1.0",
         tags: ["uploaded", "ai-generated"],
-        steps: [],
-        content_html: contentHtml,
+        steps: parsed.steps,
+        content_html: null,
         role_visibility: [],
         created_by: user.email,
         last_updated: new Date().toISOString().split("T")[0],
